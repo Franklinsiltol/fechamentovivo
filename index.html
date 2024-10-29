@@ -1,83 +1,217 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Comissão Dashboard</title>
+    <title>Fechamento Vivo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 100%; max-width: 800px; }
-        .kpi-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
-        .progress-bar { height: 20px; background-color: #ddd; border-radius: 10px; overflow: hidden; margin-top: 5px; }
-        .progress { height: 100%; background-color: #4CAF50; text-align: center; color: white; font-weight: bold; }
-        .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
-        .meta div { text-align: center; padding: 5px; border-radius: 4px; background-color: #eee; font-size: 12px; }
-        .meta .active { background-color: #4CAF50; color: white; }
-        .title { font-weight: bold; font-size: 18px; }
-        @media (max-width: 600px) { .title { font-size: 16px; } }
+        /* Reset básico */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        /* Layout e fontes */
+        body { 
+            font-family: 'Roboto', sans-serif; 
+            background-color: #f4f4f4; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex-direction: column; 
+            min-height: 100vh; 
+            padding: 20px; 
+        }
+
+        /* Cabeçalho */
+        header {
+            background-color: #333;
+            color: #fff;
+            width: 100%;
+            padding: 15px;
+            text-align: center;
+            font-size: 22px;
+            font-weight: 700;
+        }
+
+        /* Rodapé */
+        footer {
+            background-color: #333;
+            color: #fff;
+            width: 100%;
+            padding: 10px;
+            text-align: center;
+            font-size: 14px;
+            position: fixed;
+            bottom: 0;
+        }
+
+        /* Container principal de login */
+        .login-container {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .login-container img { 
+            width: 80px; 
+            margin-bottom: 10px; 
+        }
+        .login-container h2 { 
+            margin-bottom: 20px; 
+            font-size: 26px; 
+            font-weight: 700; 
+            color: #333; 
+        }
+
+        /* Cards de metas */
+        .cards-container {
+            display: grid;
+            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 20px;
+            margin-bottom: 60px;
+        }
+        .card {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        .card-title {
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .highlight {
+            font-size: 18px;
+            font-weight: 700;
+            color: #333;
+        }
+        .kpi-metas {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: left;
+        }
+        .kpi-metas div {
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .kpi-metas div.active { 
+            background-color: #333; 
+            color: #fff; 
+        }
+        .progress-container {
+            background-color: #ddd;
+            border-radius: 5px;
+            height: 10px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            border-radius: 5px;
+            background-color: #333;
+        }
+        .gap { 
+            font-size: 14px; 
+            color: #888; 
+        }
+
+        /* Responsividade */
+        @media (max-width: 600px) {
+            .card { padding: 15px; }
+            .card-title { font-size: 18px; }
+        }
     </style>
 </head>
 <body>
-    <h1>Comissão Dashboard</h1>
-    <div class="dashboard" id="dashboard"></div>
+    <!-- Cabeçalho -->
+    <header>
+        Fechamento Vivo
+    </header>
 
-    <script>
-        // Dados de metas para cada KPI
-        const KPIs = [
-            { title: "Novos Ativos", minima: 9, meta: 13, super: 15, mega: 17, atingimento: 12 },
-            { title: "Migrados", minima: 6, meta: 8, super: 10, mega: 14, atingimento: 7 },
-            { title: "Receita", minima: 6000, meta: 8000, super: 14000, mega: 19000, atingimento: 8500 },
-            { title: "Churn", minima: -10, meta: 00, super: 5, mega: 20, atingimento: -5, isPercentage: true }
-        ];
+    <!-- Container de login principal -->
+    <div class="login-container">
+        <img src="https://logospng.org/download/sumup/sumup-256.png" alt="SumUp Logo">
+        <h2>Bem-vindo à plataforma de controle de metas</h2>
+    </div>
 
-        // Função para calcular progresso e gap
-        function calculateProgress(atingimento, minima, meta, superMeta, megaMeta, isChurn = false) {
-            let progress;
-            if (isChurn) {
-                // Para Churn: -10% é 0% de progresso, 0% é 100%
-                progress = atingimento <= -10 ? 0 : Math.min(((atingimento + 10) / (meta + 10)) * 100, 100);
-            } else {
-                progress = Math.min((atingimento / meta) * 100, 100);
-            }
+    <!-- Container dos cards de metas -->
+    <div class="cards-container">
+        <!-- Card Novos Ativos -->
+        <div class="card">
+            <div class="card-title">Novos Ativos</div>
+            <div class="highlight">Atingimento: 12</div>
+            <div class="gap">Gap: 1 para a Meta</div>
+            <div class="progress-container">
+                <div class="progress-bar" style="width: 92%;"></div>
+            </div>
+            <div class="kpi-metas">
+                <div class="active">Mínima: 9</div>
+                <div>Meta: 13</div>
+                <div>Super Meta: 15</div>
+                <div>Mega Meta: 17</div>
+            </div>
+        </div>
 
-            let gap = meta - atingimento;
-            let level = "Minima";
-            if (atingimento >= minima) level = "Minima";
-            if (atingimento >= meta) level = "Meta";
-            if (atingimento >= superMeta) level = "Super Meta";
-            if (atingimento >= megaMeta) level = "Mega Meta";
+        <!-- Card Migrados -->
+        <div class="card">
+            <div class="card-title">Migrados</div>
+            <div class="highlight">Atingimento: 7</div>
+            <div class="gap">Gap: 1 para a Meta</div>
+            <div class="progress-container">
+                <div class="progress-bar" style="width: 88%;"></div>
+            </div>
+            <div class="kpi-metas">
+                <div class="active">Mínima: 6</div>
+                <div>Meta: 8</div>
+                <div>Super Meta: 10</div>
+                <div>Mega Meta: 14</div>
+            </div>
+        </div>
 
-            return { progress, gap, level };
-        }
+        <!-- Card Receita -->
+        <div class="card">
+            <div class="card-title">Receita</div>
+            <div class="highlight">Atingimento: 7500</div>
+            <div class="gap">Gap: 500 para a Meta</div>
+            <div class="progress-container">
+                <div class="progress-bar" style="width: 94%;"></div>
+            </div>
+            <div class="kpi-metas">
+                <div class="active">Mínima: 6000</div>
+                <div>Meta: 8000</div>
+                <div>Super Meta: 14000</div>
+                <div>Mega Meta: 19000</div>
+            </div>
+        </div>
 
-        // Renderiza o dashboard
-        function renderDashboard() {
-            const dashboard = document.getElementById("dashboard");
-            KPIs.forEach(kpi => {
-                const { progress, gap, level } = calculateProgress(kpi.atingimento, kpi.minima, kpi.meta, kpi.super, kpi.mega, kpi.isPercentage);
-                const gapText = kpi.isPercentage ? `${gap}%` : gap;
+        <!-- Card Churn -->
+        <div class="card">
+            <div class="card-title">Churn</div>
+            <div class="highlight">Atingimento: -5%</div>
+            <div class="gap">Gap: 5% para a Meta</div>
+            <div class="progress-container">
+                <div class="progress-bar" style="width: 50%;"></div>
+            </div>
+            <div class="kpi-metas">
+                <div class="active">Mínima: -10%</div>
+                <div>Meta: 0%</div>
+                <div>Super Meta: 5%</div>
+                <div>Mega Meta: 20%</div>
+            </div>
+        </div>
+    </div>
 
-                const kpiCard = document.createElement("div");
-                kpiCard.className = "kpi-card";
-                kpiCard.innerHTML = `
-                    <div class="title">${kpi.title}</div>
-                    <div>Atingimento: ${kpi.isPercentage ? kpi.atingimento + "%" : kpi.atingimento}</div>
-                    <div>Gap para Meta: ${gapText}</div>
-                    <div class="progress-bar">
-                        <div class="progress" style="width: ${progress}%;">${progress.toFixed(1)}%</div>
-                    </div>
-                    <div class="meta">
-                        <div class="${level === 'Minima' ? 'active' : ''}">Minima: ${kpi.minima}</div>
-                        <div class="${level === 'Meta' ? 'active' : ''}">Meta: ${kpi.meta}</div>
-                        <div class="${level === 'Super Meta' ? 'active' : ''}">Super: ${kpi.super}</div>
-                        <div class="${level === 'Mega Meta' ? 'active' : ''}">Mega: ${kpi.mega}</div>
-                    </div>
-                `;
-                dashboard.appendChild(kpiCard);
-            });
-        }
-
-        renderDashboard();
-    </script>
+    <!-- Rodapé -->
+    <footer>
+        &copy; 2024 Fechamento Vivo - Todos os direitos reservados
+    </footer>
 </body>
 </html>
