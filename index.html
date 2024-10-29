@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comissão Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; width: 100%; max-width: 800px; }
+        .kpi-card { border: 1px solid #ddd; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+        .progress-bar { height: 20px; background-color: #ddd; border-radius: 10px; overflow: hidden; margin-top: 5px; }
+        .progress { height: 100%; background-color: #4CAF50; text-align: center; color: white; font-weight: bold; }
+        .meta { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+        .meta div { text-align: center; padding: 5px; border-radius: 4px; background-color: #eee; font-size: 12px; }
+        .meta .active { background-color: #4CAF50; color: white; }
+        .title { font-weight: bold; font-size: 18px; }
+        @media (max-width: 600px) { .title { font-size: 16px; } }
+    </style>
+</head>
+<body>
+    <h1>Comissão Dashboard</h1>
+    <div class="dashboard" id="dashboard"></div>
+
+    <script>
+        // Dados de metas para cada KPI
+        const KPIs = [
+            { title: "Novos Ativos", minima: 9, meta: 13, super: 15, mega: 17, atingimento: 12 },
+            { title: "Migrados", minima: 6, meta: 8, super: 10, mega: 14, atingimento: 7 },
+            { title: "Receita", minima: 6000, meta: 8000, super: 14000, mega: 19000, atingimento: 8500 },
+            { title: "Churn", minima: -10, meta: 00, super: 5, mega: 20, atingimento: -5, isPercentage: true }
+        ];
+
+        // Função para calcular progresso e gap
+        function calculateProgress(atingimento, minima, meta, superMeta, megaMeta, isChurn = false) {
+            let progress;
+            if (isChurn) {
+                // Para Churn: -10% é 0% de progresso, 0% é 100%
+                progress = atingimento <= -10 ? 0 : Math.min(((atingimento + 10) / (meta + 10)) * 100, 100);
+            } else {
+                progress = Math.min((atingimento / meta) * 100, 100);
+            }
+
+            let gap = meta - atingimento;
+            let level = "Minima";
+            if (atingimento >= minima) level = "Minima";
+            if (atingimento >= meta) level = "Meta";
+            if (atingimento >= superMeta) level = "Super Meta";
+            if (atingimento >= megaMeta) level = "Mega Meta";
+
+            return { progress, gap, level };
+        }
+
+        // Renderiza o dashboard
+        function renderDashboard() {
+            const dashboard = document.getElementById("dashboard");
+            KPIs.forEach(kpi => {
+                const { progress, gap, level } = calculateProgress(kpi.atingimento, kpi.minima, kpi.meta, kpi.super, kpi.mega, kpi.isPercentage);
+                const gapText = kpi.isPercentage ? `${gap}%` : gap;
+
+                const kpiCard = document.createElement("div");
+                kpiCard.className = "kpi-card";
+                kpiCard.innerHTML = `
+                    <div class="title">${kpi.title}</div>
+                    <div>Atingimento: ${kpi.isPercentage ? kpi.atingimento + "%" : kpi.atingimento}</div>
+                    <div>Gap para Meta: ${gapText}</div>
+                    <div class="progress-bar">
+                        <div class="progress" style="width: ${progress}%;">${progress.toFixed(1)}%</div>
+                    </div>
+                    <div class="meta">
+                        <div class="${level === 'Minima' ? 'active' : ''}">Minima: ${kpi.minima}</div>
+                        <div class="${level === 'Meta' ? 'active' : ''}">Meta: ${kpi.meta}</div>
+                        <div class="${level === 'Super Meta' ? 'active' : ''}">Super: ${kpi.super}</div>
+                        <div class="${level === 'Mega Meta' ? 'active' : ''}">Mega: ${kpi.mega}</div>
+                    </div>
+                `;
+                dashboard.appendChild(kpiCard);
+            });
+        }
+
+        renderDashboard();
+    </script>
+</body>
+</html>
