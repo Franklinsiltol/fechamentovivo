@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeuroAssist - Assistente Inteligente (v2.0)</title>
-    <!-- Dependências -->
+    <title>NeuroAssist - Assistente Inteligente Multilíngue</title>
     <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder@1.3.3"></script>
-    <!-- Estilos -->
+    <script src="https://cdn.jsdelivr.net/npm/i18next@21.6.10/i18next.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/i18next-http-backend@1.4.1/i18nextHttpBackend.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -20,6 +20,7 @@
             --accent: #4CAF50;
             --primary: #007BFF;
             --error: #F44336;
+            --warning: #FFC107;
         }
 
         * {
@@ -149,16 +150,6 @@
             position: relative;
             animation: fadeIn 0.3s ease-out;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            word-wrap: break-word;
-        }
-        
-        .message a {
-            color: #8ab4f8;
-            text-decoration: underline;
-        }
-        
-        .message a:hover {
-            text-decoration: none;
         }
 
         @keyframes fadeIn {
@@ -463,6 +454,83 @@
             transform: translateY(0);
         }
 
+        /* Language selector styles */
+        .language-selector {
+            position: relative;
+            margin-left: 1rem;
+        }
+
+        .language-button {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-family: 'Inter', sans-serif;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .language-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background-color: var(--dark-gray);
+            border: 1px solid var(--medium-gray);
+            border-radius: 8px;
+            padding: 0.5rem 0;
+            min-width: 120px;
+            z-index: 100;
+            display: none;
+        }
+
+        .language-dropdown.show {
+            display: block;
+        }
+
+        .language-option {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .language-option:hover {
+            background-color: var(--medium-gray);
+        }
+
+        /* Link styles */
+        .message a {
+            color: var(--accent);
+            text-decoration: underline;
+            word-break: break-all;
+        }
+
+        .message a:hover {
+            color: #3d8b40;
+        }
+
+        /* Code block styles */
+        .code-block {
+            background-color: var(--medium-gray);
+            border-radius: 6px;
+            padding: 0.75rem;
+            margin: 0.5rem 0;
+            font-family: monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+        }
+
+        /* Warning message */
+        .warning-message {
+            background-color: var(--warning);
+            color: var(--black);
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            margin: 0.5rem 0;
+            font-size: 0.9em;
+        }
+
         @media (max-width: 768px) {
             .app-container {
                 height: 100vh;
@@ -480,12 +548,24 @@
             .button {
                 padding: 0.75rem;
             }
+
+            header {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .settings-toggle {
+                margin-left: 0;
+                order: 3;
+                width: 100%;
+                justify-content: flex-end;
+            }
         }
     </style>
 </head>
 <body>
     <div id="updateBanner" class="update-banner" style="display: none;">
-        Nova atualização disponível! <a href="#" id="refreshLink">Recarregar agora</a>
+        Nova atualização disponível! <a href="#" id="refreshLink">Recarregar</a>
     </div>
     
     <div class="app-container">
@@ -494,13 +574,30 @@
                 <div class="logo-icon">N</div>
                 <div class="logo-text">NeuroAssist</div>
             </div>
+            
+            <div class="language-selector">
+                <button class="language-button" id="languageButton">
+                    <span id="currentLanguage">PT</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+                <div class="language-dropdown" id="languageDropdown">
+                    <div class="language-option" data-lang="pt">Português</div>
+                    <div class="language-option" data-lang="en">English</div>
+                    <div class="language-option" data-lang="es">Español</div>
+                    <div class="language-option" data-lang="fr">Français</div>
+                </div>
+            </div>
+            
             <div class="settings-toggle">
                 <label class="toggle-switch">
                     <input type="checkbox" id="advancedModeToggle">
                     <span class="toggle-slider"></span>
                 </label>
-                <span>Modo Avançado</span>
+                <span id="advancedModeLabel">Modo Avançado</span>
             </div>
+            
             <div class="status-indicator">
                 <div class="status-dot loading"></div>
                 <span id="statusText">Conectando...</span>
@@ -513,7 +610,7 @@
             </div>
 
             <div class="input-area">
-                <input type="text" id="questionInput" placeholder="Digite sua mensagem ou '/ajuda'" autocomplete="off">
+                <input type="text" id="questionInput" placeholder="Digite sua mensagem..." autocomplete="off">
                 <button id="suggestButton" class="button" title="Sugerir perguntas e respostas">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -544,554 +641,288 @@
     <!-- Modal para sugestões -->
     <div id="suggestionModal" class="modal">
         <div class="modal-content">
-            <span class="close-modal">×</span>
+            <span class="close-modal">&times;</span>
             <iframe class="modal-iframe" id="suggestionForm" src="https://docs.google.com/forms/d/e/1FAIpQLSdK1OUPcBGtMRdWQz4JhyeQBuet-wXbEQ4CyAX07f6rHSvdyA/viewform?embedded=true" frameborder="0" marginheight="0" marginwidth="0">Carregando…</iframe>
         </div>
     </div>
 
     <script>
-        class NeuroAssist {
+        // Configurações
+        const CONFIG = {
+            SHEET_ID: "1pgoYg76gutqLnOlsk3mN40HfzN9n-x_6oJQcfkZEBzY",
+            SHEET_NAME: "Retenção",
+            AUTO_UPDATE_INTERVAL: 600000, // 10 minutos em milissegundos
+            DB_NAME: "NeuroAssistDB",
+            STORE_NAME: "KnowledgeBase",
+            DATA_KEY: "qaData",
+            LAST_UPDATE_KEY: "lastUpdate",
+            MODEL_KEY: "useModel",
+            LANG_KEY: "userLanguage",
+            SIMILARITY_THRESHOLD: 0.75, // Limiar de similaridade para considerar uma correspondência
+            MAX_HISTORY: 10, // Número máximo de mensagens no histórico
+            TYPING_SPEED: 20 // Milissegundos por caractere para efeito de digitação
+        };
+
+        // Elementos da interface
+        const questionInput = document.getElementById('questionInput');
+        const askButton = document.getElementById('askButton');
+        const suggestButton = document.getElementById('suggestButton');
+        const chatArea = document.getElementById('chatArea');
+        const statusText = document.getElementById('statusText');
+        const statusDot = document.querySelector('.status-dot');
+        const autoUpdateStatus = document.getElementById('autoUpdateStatus');
+        const updateBanner = document.getElementById('updateBanner');
+        const refreshLink = document.getElementById('refreshLink');
+        const modelLoadingProgress = document.getElementById('modelLoadingProgress');
+        const modelStatusText = document.getElementById('modelStatusText');
+        const modelProgressText = document.getElementById('modelProgressText');
+        const modelProgressBar = document.getElementById('modelProgressBar');
+        const advancedModeToggle = document.getElementById('advancedModeToggle');
+        const advancedModeLabel = document.getElementById('advancedModeLabel');
+        const suggestionModal = document.getElementById('suggestionModal');
+        const closeModal = document.querySelector('.close-modal');
+        const languageButton = document.getElementById('languageButton');
+        const languageDropdown = document.getElementById('languageDropdown');
+        const currentLanguage = document.getElementById('currentLanguage');
+
+        // Variáveis globais
+        let db;
+        let fuse;
+        let qaData = [];
+        let lastUpdateHash = "";
+        let autoUpdateInterval;
+        let useModel = null;
+        let modelLoaded = false;
+        let modelLoading = false;
+        let conversationHistory = [];
+        let advancedModeEnabled = false;
+        let currentLang = 'pt';
+        let i18n;
+        let typingInterval;
+
+        // Inicialização do i18n
+        const initI18n = async () => {
+            return new Promise((resolve) => {
+                i18n = i18next.createInstance();
+                
+                i18n.use(i18nextHttpBackend).init({
+                    lng: currentLang,
+                    fallbackLng: 'pt',
+                    debug: false,
+                    backend: {
+                        loadPath: 'locales/{{lng}}/translation.json'
+                    }
+                }, () => {
+                    updateUI();
+                    resolve();
+                });
+            });
+        };
+
+        // Atualiza a UI com as traduções
+        const updateUI = () => {
+            if (!i18n) return;
+            
+            questionInput.placeholder = i18n.t('inputPlaceholder');
+            advancedModeLabel.textContent = i18n.t('advancedMode');
+            currentLanguage.textContent = currentLang.toUpperCase();
+            
+            // Atualiza outros elementos conforme necessário
+        };
+
+        class ChatBot {
             constructor() {
-                // Configurações do aplicativo
-                this.config = {
-                    SHEET_ID: "1pgoYg76gutqLnOlsk3mN40HfzN9n-x_6oJQcfkZEBzY",
-                    SHEET_NAME: "Retenção",
-                    AUTO_UPDATE_INTERVAL: 600000, // 10 minutos
-                    DB_NAME: "NeuroAssistDB",
-                    STORE_NAME: "KnowledgeBase",
-                    DATA_KEY: "qaData",
-                    LAST_UPDATE_KEY: "lastUpdate",
-                    MODEL_KEY: "useModel",
-                    SIMILARITY_THRESHOLD: 0.7, // Limiar de similaridade semântica
-                    FUSE_THRESHOLD: 0.35, // Limiar do Fuse.js para resposta direta
-                };
-
-                // Mapeamento de elementos da UI
-                this.elements = {
-                    questionInput: document.getElementById('questionInput'),
-                    askButton: document.getElementById('askButton'),
-                    suggestButton: document.getElementById('suggestButton'),
-                    chatArea: document.getElementById('chatArea'),
-                    statusText: document.getElementById('statusText'),
-                    statusDot: document.querySelector('.status-dot'),
-                    autoUpdateStatus: document.getElementById('autoUpdateStatus'),
-                    updateBanner: document.getElementById('updateBanner'),
-                    refreshLink: document.getElementById('refreshLink'),
-                    modelLoadingProgress: document.getElementById('modelLoadingProgress'),
-                    modelStatusText: document.getElementById('modelStatusText'),
-                    modelProgressText: document.getElementById('modelProgressText'),
-                    modelProgressBar: document.getElementById('modelProgressBar'),
-                    advancedModeToggle: document.getElementById('advancedModeToggle'),
-                    suggestionModal: document.getElementById('suggestionModal'),
-                    closeModal: document.querySelector('.close-modal'),
-                };
-
-                // Estado da aplicação
-                this.state = {
-                    db: null,
-                    fuse: null,
-                    qaData: [],
-                    lastUpdateHash: "",
-                    autoUpdateIntervalId: null,
-                    useModel: null,
-                    isModelLoaded: false,
-                    isModelLoading: false,
-                    isAdvancedMode: false,
-                    conversationHistory: [],
-                };
-
-                this._init();
+                this.init();
             }
 
-            /**
-             * Inicializa o chatbot, carregando banco de dados, dados iniciais e eventos.
-             */
-            async _init() {
+            async init() {
+                await initI18n();
+                await this.openDatabase();
+                await this.loadUserLanguage();
+                await this.loadInitialData();
+                this.setupEventListeners();
+                this.startAutoUpdate();
+                this.checkAdvancedModeStatus();
+            }
+
+            async loadUserLanguage() {
                 try {
-                    await this._initDatabase();
-                    await this._loadInitialData();
-                    this._setupEventListeners();
-                    this._startAutoUpdate();
-                    await this._checkAdvancedModeStatus();
+                    const savedLang = await this.getFromDB(CONFIG.LANG_KEY);
+                    if (savedLang) {
+                        currentLang = savedLang;
+                        if (i18n) {
+                            await i18n.changeLanguage(savedLang);
+                            updateUI();
+                        }
+                    }
                 } catch (error) {
-                    console.error("Falha na inicialização crítica:", error);
-                    this._updateStatus("Erro crítico na inicialização", 'error');
+                    console.error("Erro ao carregar idioma:", error);
                 }
             }
 
-            // --- MÉTODOS DE INICIALIZAÇÃO E DADOS ---
+            async saveUserLanguage(lang) {
+                try {
+                    await this.saveToDB(CONFIG.LANG_KEY, lang);
+                    currentLang = lang;
+                    if (i18n) {
+                        await i18n.changeLanguage(lang);
+                        updateUI();
+                    }
+                } catch (error) {
+                    console.error("Erro ao salvar idioma:", error);
+                }
+            }
 
-            /**
-             * Abre ou cria o banco de dados IndexedDB.
-             */
-            async _initDatabase() {
+            async checkAdvancedModeStatus() {
+                try {
+                    const savedStatus = await this.getFromDB(CONFIG.MODEL_KEY);
+                    if (savedStatus) {
+                        advancedModeEnabled = true;
+                        advancedModeToggle.checked = true;
+                        this.startModelLoading();
+                    }
+                } catch (error) {
+                    console.error("Erro ao verificar status do modo avançado:", error);
+                }
+            }
+
+            async openDatabase() {
                 return new Promise((resolve, reject) => {
-                    const request = indexedDB.open(this.config.DB_NAME, 3);
-                    request.onupgradeneeded = (e) => {
-                        const db = e.target.result;
-                        if (!db.objectStoreNames.contains(this.config.STORE_NAME)) {
-                            db.createObjectStore(this.config.STORE_NAME);
+                    const request = indexedDB.open(CONFIG.DB_NAME, 4);
+                    
+                    request.onupgradeneeded = (event) => {
+                        const db = event.target.result;
+                        if (!db.objectStoreNames.contains(CONFIG.STORE_NAME)) {
+                            db.createObjectStore(CONFIG.STORE_NAME);
                         }
                     };
-                    request.onsuccess = (e) => {
-                        this.state.db = e.target.result;
-                        resolve();
+                    
+                    request.onsuccess = (event) => {
+                        db = event.target.result;
+                        resolve(db);
                     };
-                    request.onerror = (e) => {
-                        console.error("Erro no IndexedDB:", e.target.error);
-                        reject(e.target.error);
+                    
+                    request.onerror = (event) => {
+                        console.error("Erro ao abrir IndexedDB:", event.target.error);
+                        reject(event.target.error);
                     };
                 });
             }
 
-            /**
-             * Carrega os dados do IndexedDB. Se não houver, busca da planilha.
-             */
-            async _loadInitialData() {
+            async getFromDB(key) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(CONFIG.STORE_NAME, 'readonly');
+                    const store = transaction.objectStore(CONFIG.STORE_NAME);
+                    
+                    const request = store.get(key);
+                    
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            async saveToDB(key, value) {
+                return new Promise((resolve, reject) => {
+                    const transaction = db.transaction(CONFIG.STORE_NAME, 'readwrite');
+                    const store = transaction.objectStore(CONFIG.STORE_NAME);
+                    
+                    store.put(value, key);
+                    
+                    transaction.oncomplete = () => resolve();
+                    transaction.onerror = () => reject(transaction.error);
+                });
+            }
+
+            async loadInitialData() {
                 try {
-                    const { data, hash } = await this._loadFromDatabase();
+                    const data = await this.getFromDB(CONFIG.DATA_KEY);
+                    const hash = await this.getFromDB(CONFIG.LAST_UPDATE_KEY);
+                    
                     if (data && data.length > 0) {
-                        this.state.qaData = data;
-                        this.state.lastUpdateHash = hash;
-                        this._initSearchEngine();
-                        this._updateStatus(`Pronto com ${this.state.qaData.length} respostas`, 'success');
-                        this._addBotMessage("Olá! Sou o NeuroAssist. Como posso ajudar? Digite `/ajuda` para ver os comandos.");
+                        qaData = data;
+                        lastUpdateHash = hash;
+                        this.initSearchEngine();
+                        this.updateStatus(i18n.t('status.ready', { count: qaData.length }), 'success');
+                        this.addBotMessage(i18n.t('welcomeMessage'));
                     } else {
-                        await this._fetchAndUpdateData();
+                        await this.fetchAndUpdateData();
                     }
                 } catch (error) {
                     console.error("Erro ao carregar dados iniciais:", error);
-                    this._updateStatus("Erro ao carregar dados", 'error');
-                    await this._fetchAndUpdateData();
+                    this.updateStatus(i18n.t('status.loadError'), 'error');
+                    await this.fetchAndUpdateData();
                 }
             }
 
-            /**
-             * Busca os dados da planilha do Google Sheets.
-             */
-            async _fetchSheetData() {
-                this._updateStatus("Atualizando base de dados...", 'loading');
-                const url = `https://docs.google.com/spreadsheets/d/${this.config.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(this.config.SHEET_NAME)}&t=${Date.now()}`;
+            async fetchSheetData() {
+                this.updateStatus(i18n.t('status.updating'), 'loading');
+                
+                const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(CONFIG.SHEET_NAME)}&t=${Date.now()}`;
                 
                 try {
                     const response = await fetch(url);
                     if (!response.ok) throw new Error(`Erro HTTP: ${response.status}`);
                     
                     const csvText = await response.text();
-                    const currentHash = this._hashString(csvText);
-
-                    if (currentHash === this.state.lastUpdateHash) {
-                        this.elements.autoUpdateStatus.textContent = `Verificado às ${new Date().toLocaleTimeString()} - Sem alterações.`;
-                        this._updateStatus(`Pronto com ${this.state.qaData.length} respostas`, 'success');
-                        return { updated: false };
+                    const currentHash = this.hashString(csvText);
+                    
+                    if (currentHash === lastUpdateHash) {
+                        autoUpdateStatus.textContent = i18n.t('status.checkedAt', { time: new Date().toLocaleTimeString() }) + ' - ' + i18n.t('status.noChanges');
+                        return { data: qaData, hash: lastUpdateHash, updated: false };
                     }
                     
-                    const parsedData = this._parseCSV(csvText);
+                    const parsedData = this.parseCSV(csvText);
                     const headers = parsedData[0].map(h => h.trim().toLowerCase());
-                    const questionIndex = headers.indexOf("pergunta");
-                    const answerIndex = headers.indexOf("resposta");
-
+                    
+                    // Suporte a múltiplos idiomas - procura por cabeçalhos como "pergunta_pt", "resposta_en", etc.
+                    const questionIndex = this.findBestHeaderIndex(headers, "pergunta", currentLang);
+                    const answerIndex = this.findBestHeaderIndex(headers, "resposta", currentLang);
+                    
                     if (questionIndex === -1 || answerIndex === -1) {
-                        throw new Error("Cabeçalhos 'pergunta' ou 'resposta' não encontrados na planilha.");
+                        throw new Error(i18n.t('errors.missingHeaders'));
                     }
                     
                     const formattedData = parsedData.slice(1)
                         .map(row => ({
                             question: row[questionIndex]?.trim() || "",
-                            answer: row[answerIndex]?.trim() || ""
+                            answer: row[answerIndex]?.trim() || "",
+                            // Adiciona suporte para tags/metadados
+                            tags: row[headers.indexOf("tags")]?.trim().split(",").map(t => t.trim()) || [],
+                            lang: row[headers.indexOf("lang")]?.trim() || "pt"
                         }))
                         .filter(item => item.question && item.answer);
                     
-                    return { data: formattedData, hash: currentHash, updated: true };
-
+                    return { 
+                        data: formattedData, 
+                        hash: currentHash,
+                        updated: true
+                    };
+                    
                 } catch (error) {
-                    console.error("Erro ao buscar dados da planilha:", error);
-                    this._updateStatus("Erro ao atualizar", 'error');
+                    console.error("Erro ao buscar dados:", error);
+                    this.updateStatus(i18n.t('status.updateError'), 'error');
                     throw error;
                 }
             }
-            
-            /**
-             * Atualiza os dados locais (memória, IndexedDB) e o motor de busca.
-             */
-            async _fetchAndUpdateData(isManual = false) {
-                try {
-                    const result = await this._fetchSheetData();
-                    if (result.updated) {
-                        this.state.qaData = result.data;
-                        this.state.lastUpdateHash = result.hash;
-                        await this._saveToDatabase(result.data, result.hash);
-                        this._initSearchEngine();
-                        
-                        this._updateStatus(`Atualizado com ${result.data.length} respostas`, 'success');
-                        this.elements.autoUpdateStatus.textContent = `Atualizado às ${new Date().toLocaleTimeString()}`;
-                        
-                        if (this.elements.chatArea.children.length > 1 || isManual) {
-                           this._addBotMessage(`Base de conhecimento atualizada! Agora tenho ${result.data.length} respostas.`);
-                        }
-                    }
-                } catch (error) {
-                    this._addBotMessage("Ocorreu um erro durante a atualização. Por favor, tente novamente mais tarde.");
-                }
-            }
-            
-            /**
-             * Inicia a verificação automática por atualizações.
-             */
-            _startAutoUpdate() {
-                if (this.state.autoUpdateIntervalId) clearInterval(this.state.autoUpdateIntervalId);
-                
-                this.state.autoUpdateIntervalId = setInterval(async () => {
-                    try {
-                        const { updated } = await this._fetchSheetData();
-                        if (updated) {
-                            this._showUpdateBanner();
-                        }
-                    } catch (error) {
-                        console.error("Erro na verificação automática:", error);
-                        this.elements.autoUpdateStatus.textContent = `Erro na verificação (${new Date().toLocaleTimeString()})`;
-                    }
-                }, this.config.AUTO_UPDATE_INTERVAL);
-                
-                this.elements.autoUpdateStatus.textContent = `Próxima verificação em ${this.config.AUTO_UPDATE_INTERVAL / 60000} min.`;
-            }
 
-            // --- MÉTODOS DE BUSCA E IA ---
-
-            /**
-             * Inicializa o Fuse.js para busca textual.
-             */
-            _initSearchEngine() {
-                this.state.fuse = new Fuse(this.state.qaData, {
-                    keys: ['question'],
-                    includeScore: true,
-                    threshold: 0.5,
-                    ignoreLocation: true,
-                    minMatchCharLength: 3,
-                });
-            }
-
-            /**
-             * Lida com a pergunta do usuário, decidindo qual método de busca usar.
-             */
-            async _handleQuestion() {
-                const question = this.elements.questionInput.value.trim();
-                if (!question) return;
+            findBestHeaderIndex(headers, prefix, lang) {
+                // Tenta encontrar o cabeçalho específico do idioma primeiro (ex: "pergunta_pt")
+                const langSpecific = headers.indexOf(`${prefix}_${lang}`);
+                if (langSpecific !== -1) return langSpecific;
                 
-                this._addUserMessage(question);
-                this.elements.questionInput.value = '';
+                // Tenta encontrar o cabeçalho padrão (ex: "pergunta")
+                const generic = headers.indexOf(prefix);
+                if (generic !== -1) return generic;
                 
-                // Verifica se é um comando especial
-                if (question.startsWith('/')) {
-                    this._handleCommand(question);
-                    return;
+                // Tenta encontrar qualquer cabeçalho que comece com o prefixo
+                for (let i = 0; i < headers.length; i++) {
+                    if (headers[i].startsWith(prefix)) return i;
                 }
                 
-                this._showTypingIndicator();
-
-                try {
-                    // 1. Tenta com o modelo semântico (se ativo e carregado)
-                    if (this.state.isAdvancedMode && this.state.isModelLoaded) {
-                        const embeddingMatch = await this._findBestMatchWithEmbedding(question);
-                        if (embeddingMatch) {
-                            this._addBotMessage(embeddingMatch.item.answer);
-                            return;
-                        }
-                    }
-                    
-                    // 2. Fallback para busca textual com Fuse.js
-                    setTimeout(() => {
-                        if (!this.state.fuse) {
-                            this._addBotMessage("A base de conhecimento não está pronta. Tente novamente em alguns segundos.");
-                            return;
-                        }
-                        
-                        const results = this.state.fuse.search(question);
-                        
-                        if (results.length > 0 && results[0].score < this.config.FUSE_THRESHOLD) {
-                            this._addBotMessage(results[0].item.answer);
-                        } else if (results.length > 0) {
-                            this._addBotMessage("Não tenho certeza, mas talvez uma destas opções ajude:", results.slice(0, 3));
-                        } else {
-                            this._addBotMessage("Desculpe, não encontrei uma resposta para isso. Você pode tentar reformular a pergunta ou usar o botão de sugestão para nos ajudar a melhorar!");
-                        }
-                    }, 800);
-
-                } catch (error) {
-                    console.error("Erro ao processar pergunta:", error);
-                    this._addBotMessage("Ocorreu um erro ao processar sua pergunta. Por favor, tente novamente.");
-                }
+                return -1;
             }
 
-            /**
-             * Encontra a melhor resposta usando o modelo semântico.
-             */
-            async _findBestMatchWithEmbedding(question) {
-                if (!this.state.isModelLoaded || !this.state.useModel) return null;
-                
-                try {
-                    const embeddings = await this.state.useModel.embed([question, ...this.state.qaData.map(item => item.question)]);
-                    const questionEmbedding = embeddings.slice(0, 1);
-                    const answerEmbeddings = embeddings.slice(1);
-                    
-                    const scores = await tf.matMul(questionEmbedding, answerEmbeddings, false, true).data();
-                    
-                    let bestScore = -1;
-                    let bestIndex = -1;
-                    
-                    scores.forEach((score, i) => {
-                        if (score > bestScore) {
-                            bestScore = score;
-                            bestIndex = i;
-                        }
-                    });
-
-                    if (bestScore > this.config.SIMILARITY_THRESHOLD) {
-                        return { item: this.state.qaData[bestIndex], score: bestScore };
-                    }
-                    return null;
-                } catch (error) {
-                    console.error("Erro ao usar embeddings:", error);
-                    return null;
-                }
-            }
-            
-            /**
-             * Lida com comandos especiais (ex: /ajuda).
-             */
-            _handleCommand(command) {
-                const parts = command.toLowerCase().split(' ');
-                const cmd = parts[0];
-
-                switch (cmd) {
-                    case '/ajuda':
-                        this._addBotMessage("Comandos disponíveis:\n`/ajuda` - Mostra esta mensagem.\n`/limpar` - Limpa a janela de chat.\n`/atualizar` - Força a busca por novas respostas.");
-                        break;
-                    case '/limpar':
-                        this.elements.chatArea.innerHTML = '';
-                        this._addBotMessage("Chat limpo!");
-                        break;
-                    case '/atualizar':
-                        this._addBotMessage("Iniciando verificação manual de atualizações...");
-                        this._fetchAndUpdateData(true);
-                        break;
-                    default:
-                        this._addBotMessage(`Comando "${cmd}" não reconhecido. Digite /ajuda para ver a lista de comandos.`);
-                }
-            }
-
-            // --- MÉTODOS DE UI E EVENTOS ---
-
-            _setupEventListeners() {
-                this.elements.askButton.addEventListener('click', () => this._handleQuestion());
-                this.elements.questionInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') this._handleQuestion();
-                });
-
-                this.elements.advancedModeToggle.addEventListener('change', (e) => {
-                    this.state.isAdvancedMode = e.target.checked;
-                    this._saveToDatabase(this.state.isAdvancedMode, this.config.MODEL_KEY);
-                    if (this.state.isAdvancedMode && !this.state.isModelLoaded) {
-                        this._startModelLoading();
-                    }
-                    this._addBotMessage(`Modo Avançado ${this.state.isAdvancedMode ? 'ativado' : 'desativado'}.`);
-                });
-                
-                this.elements.suggestButton.addEventListener('click', () => {
-                    this.elements.suggestionModal.style.display = 'flex';
-                });
-                
-                this.elements.closeModal.addEventListener('click', () => {
-                    this.elements.suggestionModal.style.display = 'none';
-                });
-                
-                window.addEventListener('click', (e) => {
-                    if (e.target === this.elements.suggestionModal) {
-                        this.elements.suggestionModal.style.display = 'none';
-                    }
-                });
-
-                this.elements.refreshLink.onclick = (e) => {
-                    e.preventDefault();
-                    this.elements.updateBanner.style.display = 'none';
-                    this._fetchAndUpdateData(true);
-                };
-            }
-            
-            _addUserMessage(text) {
-                this._addMessage(text, 'user');
-                this.state.conversationHistory.push({ role: 'user', content: text });
-                // Limita o histórico para não crescer indefinidamente
-                if (this.state.conversationHistory.length > 10) {
-                    this.state.conversationHistory.splice(0, this.state.conversationHistory.length - 10);
-                }
-            }
-
-            _addBotMessage(text, options = []) {
-                this._removeTypingIndicator();
-                
-                const showMessage = () => {
-                    this._addMessage(text, 'bot', options);
-                    this.state.conversationHistory.push({ role: 'assistant', content: text });
-                };
-
-                // Simula digitação para respostas mais longas
-                if (text.length > 50) {
-                    this._showTypingIndicator();
-                    setTimeout(showMessage, Math.min(text.length * 15, 1500));
-                } else {
-                    showMessage();
-                }
-            }
-
-            _addMessage(text, sender, options = []) {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${sender}-message`;
-
-                // **NOVO: Cria hiperlinks automaticamente**
-                const formattedText = this._createHyperlinks(text);
-                const contentDiv = document.createElement('div');
-                contentDiv.innerHTML = formattedText.replace(/\n/g, '<br>'); // Converte quebras de linha
-                messageDiv.appendChild(contentDiv);
-
-                // Adiciona botões de opção, se houver
-                if (options.length > 0) {
-                    options.forEach(result => {
-                        const button = document.createElement('button');
-                        button.className = 'option-button';
-                        button.textContent = result.item.question;
-                        button.onclick = () => {
-                            this.elements.questionInput.value = result.item.question;
-                            this._handleQuestion();
-                        };
-                        messageDiv.appendChild(button);
-                    });
-                }
-                
-                const timeDiv = document.createElement('div');
-                timeDiv.className = 'message-time';
-                timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                messageDiv.appendChild(timeDiv);
-                
-                this.elements.chatArea.appendChild(messageDiv);
-                this.elements.chatArea.scrollTop = this.elements.chatArea.scrollHeight;
-            }
-
-            _showTypingIndicator() {
-                this._removeTypingIndicator();
-                const typingDiv = document.createElement('div');
-                typingDiv.className = 'typing-indicator';
-                typingDiv.id = 'typingIndicator';
-                typingDiv.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-                this.elements.chatArea.appendChild(typingDiv);
-                this.elements.chatArea.scrollTop = this.elements.chatArea.scrollHeight;
-            }
-
-            _removeTypingIndicator() {
-                const indicator = document.getElementById('typingIndicator');
-                if (indicator) indicator.remove();
-            }
-
-            _updateStatus(text, status) { // 'success', 'loading', 'error'
-                this.elements.statusText.textContent = text;
-                this.elements.statusDot.className = 'status-dot';
-                if (status !== 'success') this.elements.statusDot.classList.add(status);
-            }
-            
-            _showUpdateBanner() {
-                this.elements.updateBanner.style.display = 'block';
-            }
-
-            // --- MÉTODOS DO MODO AVANÇADO (TENSORFLOW) ---
-
-            async _checkAdvancedModeStatus() {
-                const useAdvancedMode = await this._getFromDatabase(this.config.MODEL_KEY);
-                if (useAdvancedMode) {
-                    this.state.isAdvancedMode = true;
-                    this.elements.advancedModeToggle.checked = true;
-                    this._startModelLoading();
-                }
-            }
-
-            async _startModelLoading() {
-                if (this.state.isModelLoading || this.state.isModelLoaded) return;
-                
-                this.state.isModelLoading = true;
-                this.elements.modelLoadingProgress.style.display = 'flex';
-                
-                try {
-                    this.state.useModel = await this._loadUSEWithProgress();
-                    this.state.isModelLoaded = true;
-                    
-                    this.elements.modelStatusText.textContent = "Modelo avançado carregado!";
-                    this.elements.modelProgressText.textContent = "100%";
-                    this.elements.modelProgressBar.style.width = "100%";
-                    
-                    setTimeout(() => {
-                        this.elements.modelLoadingProgress.style.display = 'none';
-                        this._addBotMessage("✅ O Modo Avançado está ativo e pronto para entender suas perguntas com mais precisão!");
-                    }, 2000);
-
-                } catch (error) {
-                    console.error("Erro ao carregar modelo USE:", error);
-                    this.elements.modelStatusText.textContent = "Erro ao carregar modelo";
-                    this.elements.modelProgressBar.style.backgroundColor = "var(--error)";
-                    this.state.isAdvancedMode = false;
-                    this.elements.advancedModeToggle.checked = false;
-                    this._saveToDatabase(false, this.config.MODEL_KEY);
-                    this._addBotMessage("❌ Não foi possível carregar o Modo Avançado. O assistente funcionará no modo padrão.");
-                } finally {
-                    this.state.isModelLoading = false;
-                }
-            }
-
-            _loadUSEWithProgress() {
-                return new Promise((resolve, reject) => {
-                    let progress = 0;
-                    const interval = setInterval(() => {
-                        progress = Math.min(progress + 0.05, 0.95);
-                        this.elements.modelProgressText.textContent = `${Math.round(progress * 100)}%`;
-                        this.elements.modelProgressBar.style.width = `${progress * 100}%`;
-                    }, 400);
-
-                    use.load().then(model => {
-                        clearInterval(interval);
-                        resolve(model);
-                    }).catch(err => {
-                        clearInterval(interval);
-                        reject(err);
-                    });
-                });
-            }
-
-
-            // --- MÉTODOS AUXILIARES E UTILITÁRIOS ---
-
-            async _loadFromDatabase() {
-                const data = await this._getFromDatabase(this.config.DATA_KEY) || [];
-                const hash = await this._getFromDatabase(this.config.LAST_UPDATE_KEY) || "";
-                return { data, hash };
-            }
-            
-            async _saveToDatabase(value, key) {
-                return new Promise((resolve, reject) => {
-                    const tx = this.state.db.transaction(this.config.STORE_NAME, 'readwrite');
-                    tx.objectStore(this.config.STORE_NAME).put(value, key);
-                    tx.oncomplete = resolve;
-                    tx.onerror = () => reject(tx.error);
-                });
-            }
-
-            async _getFromDatabase(key) {
-                return new Promise((resolve, reject) => {
-                    const tx = this.state.db.transaction(this.config.STORE_NAME, 'readonly');
-                    const request = tx.objectStore(this.config.STORE_NAME).get(key);
-                    request.onsuccess = () => resolve(request.result);
-                    request.onerror = () => reject(request.error);
-                });
-            }
-            
-            _hashString(str) {
+            hashString(str) {
                 let hash = 0;
                 for (let i = 0; i < str.length; i++) {
                     const char = str.charCodeAt(i);
@@ -1101,41 +932,581 @@
                 return hash.toString();
             }
 
-            _parseCSV(csvText) {
-                // Regex para lidar com campos entre aspas, incluindo aspas duplas escapadas.
-                const regex = /(,|\r?\n|^)("(?:[^"]|"")*"|[^",\r\n]*)/gi;
-                let matches;
-                const data = [[]];
-                while (matches = regex.exec(csvText)) {
-                    let value = matches[2];
-                    if (value.startsWith('"') && value.endsWith('"')) {
-                        value = value.slice(1, -1).replace(/""/g, '"');
-                    }
-                    data[data.length - 1].push(value);
-                    if (matches[1] === '\n' || matches[1] === '\r\n') {
-                        data.push([]);
+            parseCSV(csvText) {
+                const lines = [];
+                let currentLine = [];
+                let currentField = "";
+                let inQuotes = false;
+                
+                for (let i = 0; i < csvText.length; i++) {
+                    const char = csvText[i];
+                    
+                    if (char === '"') {
+                        if (inQuotes && csvText[i + 1] === '"') {
+                            currentField += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === ',' && !inQuotes) {
+                        currentLine.push(currentField.trim());
+                        currentField = "";
+                    } else if (char === '\n' && !inQuotes) {
+                        currentLine.push(currentField.trim());
+                        lines.push(currentLine);
+                        currentLine = [];
+                        currentField = "";
+                    } else {
+                        currentField += char;
                     }
                 }
-                if (data[data.length - 1].length === 0) data.pop();
-                return data;
+                
+                if (currentField.trim() || currentLine.length > 0) {
+                    currentLine.push(currentField.trim());
+                    lines.push(currentLine);
+                }
+                
+                return lines;
             }
-            
-            /**
-             * Converte URLs em um texto para tags <a> clicáveis.
-             */
-            _createHyperlinks(text) {
+
+            initSearchEngine() {
+                fuse = new Fuse(qaData, {
+                    keys: ['question'],
+                    includeScore: true,
+                    threshold: 0.4,
+                    ignoreLocation: true,
+                    minMatchCharLength: 3,
+                    shouldSort: true,
+                    findAllMatches: true,
+                    includeMatches: true
+                });
+            }
+
+            async fetchAndUpdateData() {
+                try {
+                    const { data, hash, updated } = await this.fetchSheetData();
+                    
+                    if (updated) {
+                        qaData = data;
+                        lastUpdateHash = hash;
+                        await this.saveToDB(CONFIG.DATA_KEY, data);
+                        await this.saveToDB(CONFIG.LAST_UPDATE_KEY, hash);
+                        this.initSearchEngine();
+                        
+                        this.updateStatus(i18n.t('status.updated', { count: data.length }), 'success');
+                        autoUpdateStatus.textContent = i18n.t('status.updatedAt', { time: new Date().toLocaleTimeString() });
+                        
+                        if (chatArea.children.length > 0) {
+                            this.addBotMessage(i18n.t('knowledgeUpdated', { count: data.length }));
+                        }
+                    }
+                    
+                    return { data, hash, updated };
+                } catch (error) {
+                    console.error("Erro ao atualizar dados:", error);
+                    this.updateStatus(i18n.t('status.updateError'), 'error');
+                    throw error;
+                }
+            }
+
+            startAutoUpdate() {
+                if (autoUpdateInterval) {
+                    clearInterval(autoUpdateInterval);
+                }
+                
+                autoUpdateInterval = setInterval(async () => {
+                    try {
+                        const { updated } = await this.fetchSheetData();
+                        
+                        if (updated) {
+                            this.showUpdateBanner();
+                            autoUpdateStatus.textContent = i18n.t('status.updateAvailable', { time: new Date().toLocaleTimeString() });
+                        } else {
+                            autoUpdateStatus.textContent = i18n.t('status.checkedAt', { time: new Date().toLocaleTimeString() }) + ' - ' + i18n.t('status.noChanges');
+                        }
+                    } catch (error) {
+                        console.error("Erro na verificação automática:", error);
+                        autoUpdateStatus.textContent = i18n.t('status.checkError', { time: new Date().toLocaleTimeString() });
+                    }
+                }, CONFIG.AUTO_UPDATE_INTERVAL);
+                
+                autoUpdateStatus.textContent = i18n.t('status.nextCheck', { minutes: CONFIG.AUTO_UPDATE_INTERVAL / 60000 });
+            }
+
+            showUpdateBanner() {
+                updateBanner.style.display = 'block';
+                refreshLink.onclick = (e) => {
+                    e.preventDefault();
+                    this.handleManualUpdate();
+                    updateBanner.style.display = 'none';
+                };
+            }
+
+            async handleManualUpdate() {
+                this.addBotMessage(i18n.t('manualUpdateStart'));
+                try {
+                    const { data, hash, updated } = await this.fetchAndUpdateData();
+                    
+                    if (updated) {
+                        this.addBotMessage(i18n.t('manualUpdateSuccess', { count: data.length }));
+                    } else {
+                        this.addBotMessage(i18n.t('manualUpdateNoChanges'));
+                    }
+                } catch (error) {
+                    this.addBotMessage(i18n.t('manualUpdateError'));
+                }
+            }
+
+            addMessage(text, sender) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}-message`;
+                
+                // Processa URLs para transformar em links
+                const processedText = this.processTextForDisplay(text);
+                messageDiv.innerHTML = processedText;
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                messageDiv.appendChild(timeDiv);
+                
+                chatArea.appendChild(messageDiv);
+                chatArea.scrollTop = chatArea.scrollHeight;
+            }
+
+            processTextForDisplay(text) {
                 if (!text) return '';
-                const urlRegex = /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])/ig;
-                return text.replace(urlRegex, (url) => {
-                    const link = url.startsWith('www.') ? `https://` + url : url;
-                    return `<a href="${link}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+                
+                // Transforma URLs em links clicáveis
+                let processed = text.replace(
+                    /(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|]/ig,
+                    '<a href="$&" target="_blank" rel="noopener noreferrer">$&</a>'
+                );
+                
+                // Identifica blocos de código (entre ```)
+                processed = processed.replace(
+                    /```([\s\S]*?)```/g,
+                    '<div class="code-block">$1</div>'
+                );
+                
+                // Identifica mensagens de aviso (entre !!)
+                processed = processed.replace(
+                    /!!([\s\S]*?)!!/g,
+                    '<div class="warning-message">$1</div>'
+                );
+                
+                return processed;
+            }
+
+            addUserMessage(text) {
+                this.addMessage(text, 'user');
+                conversationHistory.push({ role: 'user', content: text });
+                
+                if (conversationHistory.length > CONFIG.MAX_HISTORY) {
+                    conversationHistory = conversationHistory.slice(-CONFIG.MAX_HISTORY);
+                }
+            }
+
+            async addBotMessage(text, typingEffect = true) {
+                const typingIndicator = document.getElementById('typingIndicator');
+                if (typingIndicator) {
+                    chatArea.removeChild(typingIndicator);
+                }
+                
+                if (typingEffect && text.length > 40) {
+                    const typingDiv = this.showTypingIndicator();
+                    
+                    // Efeito de digitação
+                    const messageDiv = document.createElement('div');
+                    messageDiv.className = 'message bot-message';
+                    messageDiv.style.opacity = '0';
+                    chatArea.appendChild(messageDiv);
+                    
+                    let i = 0;
+                    const speed = CONFIG.TYPING_SPEED;
+                    
+                    if (typingInterval) clearInterval(typingInterval);
+                    
+                    typingInterval = setInterval(() => {
+                        if (i < text.length) {
+                            const partialText = text.substring(0, i + 1);
+                            messageDiv.innerHTML = this.processTextForDisplay(partialText);
+                            
+                            const timeDiv = document.createElement('div');
+                            timeDiv.className = 'message-time';
+                            timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                            messageDiv.appendChild(timeDiv);
+                            
+                            messageDiv.style.opacity = '1';
+                            chatArea.scrollTop = chatArea.scrollHeight;
+                            i++;
+                        } else {
+                            clearInterval(typingInterval);
+                            chatArea.removeChild(typingDiv);
+                            conversationHistory.push({ role: 'assistant', content: text });
+                        }
+                    }, speed);
+                    
+                    return;
+                }
+                
+                this.addMessage(text, 'bot');
+                conversationHistory.push({ role: 'assistant', content: text });
+            }
+
+            showTypingIndicator() {
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'typing-indicator';
+                typingDiv.id = 'typingIndicator';
+                
+                for (let i = 0; i < 3; i++) {
+                    const dot = document.createElement('div');
+                    dot.className = 'typing-dot';
+                    typingDiv.appendChild(dot);
+                }
+                
+                chatArea.appendChild(typingDiv);
+                chatArea.scrollTop = chatArea.scrollHeight;
+                
+                return typingDiv;
+            }
+
+            showOptionsButtons(results) {
+                const typingIndicator = document.getElementById('typingIndicator');
+                if (typingIndicator) {
+                    chatArea.removeChild(typingIndicator);
+                }
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message bot-message';
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.textContent = i18n.t('didYouMean');
+                messageDiv.appendChild(contentDiv);
+                
+                results.forEach((result) => {
+                    const button = document.createElement('button');
+                    button.className = 'option-button';
+                    button.textContent = result.item.question;
+                    button.onclick = () => {
+                        questionInput.value = result.item.question;
+                        questionInput.focus();
+                    };
+                    messageDiv.appendChild(button);
+                });
+                
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'message-time';
+                timeDiv.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                messageDiv.appendChild(timeDiv);
+                
+                chatArea.appendChild(messageDiv);
+                chatArea.scrollTop = chatArea.scrollHeight;
+                
+                conversationHistory.push({ role: 'assistant', content: "Mostrou opções" });
+            }
+
+            normalizeText(text) {
+                if (!text) return '';
+                
+                // Remove acentos e caracteres especiais
+                let normalized = text
+                    .toLowerCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, "")
+                    .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "")
+                    .replace(/\s{2,}/g, ' ')
+                    .trim();
+                
+                // Remove stopwords baseadas no idioma atual
+                const stopwords = {
+                    pt: ["o", "a", "os", "as", "um", "uma", "uns", "umas", "de", "do", "da", "dos", "das", 
+                         "em", "no", "na", "nos", "nas", "por", "para", "com", "sem", "sob", "sobre", 
+                         "como", "qual", "quando", "onde", "por que", "o que", "que"],
+                    en: ["the", "a", "an", "in", "on", "at", "for", "by", "with", "without", 
+                         "under", "over", "how", "what", "when", "where", "why", "which"],
+                    es: ["el", "la", "los", "las", "un", "una", "unos", "unas", "de", "del", "al", 
+                         "en", "por", "para", "con", "sin", "sobre", "bajo", "cómo", "cuál", 
+                         "cuándo", "dónde", "por qué", "qué"],
+                    fr: ["le", "la", "les", "un", "une", "des", "de", "du", "au", "en", "pour", 
+                         "par", "avec", "sans", "sous", "sur", "comment", "quel", "quand", 
+                         "où", "pourquoi", "que"]
+                };
+                
+                const lang = currentLang in stopwords ? currentLang : 'pt';
+                const regex = new RegExp(`\\b(${stopwords[lang].join('|')})\\b`, 'gi');
+                normalized = normalized.replace(regex, '');
+                
+                return normalized.trim();
+            }
+
+            updateStatus(text, status) {
+                statusText.textContent = text;
+                statusDot.className = 'status-dot';
+                
+                if (status === 'success') {
+                    statusDot.style.backgroundColor = 'var(--accent)';
+                } else if (status === 'loading') {
+                    statusDot.classList.add('loading');
+                } else if (status === 'error') {
+                    statusDot.style.backgroundColor = 'var(--error)';
+                }
+            }
+
+            async startModelLoading() {
+                if (modelLoading || modelLoaded || !advancedModeEnabled) return;
+                
+                modelLoading = true;
+                modelLoadingProgress.style.display = 'flex';
+                modelStatusText.textContent = i18n.t('model.loading');
+                
+                try {
+                    useModel = await this.loadUSEWithProgress();
+                    modelLoaded = true;
+                    
+                    modelStatusText.textContent = i18n.t('model.loaded');
+                    modelProgressText.textContent = "100%";
+                    modelProgressBar.style.width = "100%";
+                    
+                    setTimeout(() => {
+                        modelLoadingProgress.style.display = 'none';
+                        this.addBotMessage(i18n.t('model.readyMessage'));
+                    }, 2000);
+                    
+                    await this.saveToDB(CONFIG.MODEL_KEY, true);
+                    
+                } catch (error) {
+                    console.error("Erro ao carregar o modelo:", error);
+                    modelStatusText.textContent = i18n.t('model.error');
+                    modelProgressText.textContent = i18n.t('model.errorShort');
+                    modelProgressBar.style.backgroundColor = "var(--error)";
+                    
+                    setTimeout(() => this.startModelLoading(), 60000);
+                } finally {
+                    modelLoading = false;
+                }
+            }
+
+            async loadUSEWithProgress() {
+                return new Promise((resolve, reject) => {
+                    let progress = 0;
+                    const progressInterval = setInterval(() => {
+                        progress = Math.min(progress + 0.05, 0.95);
+                        modelProgressText.textContent = `${Math.round(progress * 100)}%`;
+                        modelProgressBar.style.width = `${Math.round(progress * 100)}%`;
+                    }, 500);
+                    
+                    use.load()
+                        .then(model => {
+                            clearInterval(progressInterval);
+                            modelProgressText.textContent = "100%";
+                            modelProgressBar.style.width = "100%";
+                            resolve(model);
+                        })
+                        .catch(error => {
+                            clearInterval(progressInterval);
+                            reject(error);
+                        });
+                });
+            }
+
+            async getEmbedding(text) {
+                if (!useModel) {
+                    throw new Error("Modelo não carregado");
+                }
+                
+                const embeddings = await useModel.embed(text);
+                return embeddings.arraySync()[0];
+            }
+
+            async findBestMatchWithEmbedding(question) {
+                if (!modelLoaded || !useModel || !advancedModeEnabled) {
+                    return null;
+                }
+                
+                try {
+                    const questionEmbedding = await this.getEmbedding(question);
+                    let bestMatch = null;
+                    let bestScore = -1;
+                    
+                    // Filtra por idioma se possível
+                    const filteredData = qaData.filter(item => 
+                        !item.lang || item.lang === currentLang || item.lang === 'multi'
+                    );
+                    
+                    for (const item of filteredData) {
+                        const itemEmbedding = await this.getEmbedding(item.question);
+                        const score = this.cosineSimilarity(questionEmbedding, itemEmbedding);
+                        
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestMatch = item;
+                        }
+                    }
+                    
+                    return bestScore > CONFIG.SIMILARITY_THRESHOLD ? { item: bestMatch, score: 1 - bestScore } : null;
+                    
+                } catch (error) {
+                    console.error("Erro ao usar embeddings:", error);
+                    return null;
+                }
+            }
+
+            cosineSimilarity(vecA, vecB) {
+                if (vecA.length !== vecB.length) return 0;
+                
+                let dotProduct = 0;
+                let normA = 0;
+                let normB = 0;
+                
+                for (let i = 0; i < vecA.length; i++) {
+                    dotProduct += vecA[i] * vecB[i];
+                    normA += vecA[i] * vecA[i];
+                    normB += vecB[i] * vecB[i];
+                }
+                
+                return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+            }
+
+            async handleQuestion() {
+                const question = questionInput.value.trim();
+                if (!question) return;
+                
+                this.addUserMessage(question);
+                questionInput.value = '';
+                
+                this.showTypingIndicator();
+
+                try {
+                    // 1. Tentativa com modelo semântico
+                    if (modelLoaded && advancedModeEnabled) {
+                        const embeddingMatch = await this.findBestMatchWithEmbedding(question);
+                        if (embeddingMatch) {
+                            this.addBotMessage(embeddingMatch.item.answer);
+                            return;
+                        }
+                    }
+
+                    // 2. Fallback para busca textual
+                    setTimeout(async () => {
+                        if (!fuse || qaData.length === 0) {
+                            this.addBotMessage(i18n.t('errors.knowledgeBaseNotLoaded'));
+                            return;
+                        }
+
+                        const processedQuestion = this.normalizeText(question);
+                        const exactMatch = qaData.find(item => 
+                            this.normalizeText(item.question) === processedQuestion &&
+                            (!item.lang || item.lang === currentLang || item.lang === 'multi')
+                        );
+
+                        if (exactMatch) {
+                            this.addBotMessage(exactMatch.answer);
+                            return;
+                        }
+
+                        const results = fuse.search(processedQuestion, {
+                            threshold: 0.35,
+                            distance: 50,
+                            ignoreLocation: true,
+                            limit: 5
+                        }).filter(result => 
+                            !result.item.lang || result.item.lang === currentLang || result.item.lang === 'multi'
+                        );
+
+                        if (results.length > 0 && results[0].score < 0.3) {
+                            this.addBotMessage(results[0].item.answer);
+                        } else if (results.length > 0) {
+                            this.showOptionsButtons(results.slice(0, 3));
+                        } else {
+                            this.addBotMessage(i18n.t('noExactAnswer'));
+                            const fallbackResults = fuse.search(question, { 
+                                limit: 3,
+                                threshold: 0.5
+                            }).filter(result => 
+                                !result.item.lang || result.item.lang === currentLang || result.item.lang === 'multi'
+                            );
+                            
+                            if (fallbackResults.length > 0) {
+                                this.showOptionsButtons(fallbackResults);
+                            } else {
+                                this.addBotMessage(i18n.t('noSuggestions'));
+                            }
+                        }
+                    }, 1000);
+
+                } catch (error) {
+                    console.error("Erro ao processar pergunta:", error);
+                    this.addBotMessage(i18n.t('errors.unexpectedError'));
+                }
+            }
+
+            setupEventListeners() {
+                askButton.addEventListener('click', () => this.handleQuestion());
+                
+                questionInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') this.handleQuestion();
+                });
+                
+                let lastClick = 0;
+                document.querySelector('header').addEventListener('click', (e) => {
+                    const now = Date.now();
+                    if (now - lastClick < 300) {
+                        this.handleManualUpdate();
+                    }
+                    lastClick = now;
+                });
+                
+                advancedModeToggle.addEventListener('change', (e) => {
+                    advancedModeEnabled = e.target.checked;
+                    if (advancedModeEnabled && !modelLoaded && !modelLoading) {
+                        this.startModelLoading();
+                        this.saveToDB(CONFIG.MODEL_KEY, true);
+                    } else if (!advancedModeEnabled) {
+                        this.saveToDB(CONFIG.MODEL_KEY, false);
+                    }
+                    
+                    this.addBotMessage(i18n.t('advancedMode.' + (advancedModeEnabled ? 'enabled' : 'disabled')));
+                });
+                
+                suggestButton.addEventListener('click', () => {
+                    suggestionModal.style.display = 'flex';
+                });
+                
+                closeModal.addEventListener('click', () => {
+                    suggestionModal.style.display = 'none';
+                });
+                
+                window.addEventListener('click', (e) => {
+                    if (e.target === suggestionModal) {
+                        suggestionModal.style.display = 'none';
+                    }
+                });
+                
+                // Seletor de idioma
+                languageButton.addEventListener('click', () => {
+                    languageDropdown.classList.toggle('show');
+                });
+                
+                document.querySelectorAll('.language-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        const lang = option.dataset.lang;
+                        this.saveUserLanguage(lang);
+                        languageDropdown.classList.remove('show');
+                    });
+                });
+                
+                // Fecha o dropdown de idioma ao clicar fora
+                window.addEventListener('click', (e) => {
+                    if (!e.target.matches('.language-button') && !e.target.closest('.language-dropdown')) {
+                        languageDropdown.classList.remove('show');
+                    }
                 });
             }
         }
 
-        // Inicializa a aplicação quando o DOM estiver pronto.
         document.addEventListener('DOMContentLoaded', () => {
-            window.neuroAssist = new NeuroAssist();
+            window.chatBot = new ChatBot();
+            questionInput.focus();
         });
     </script>
 </body>
